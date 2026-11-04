@@ -8,15 +8,9 @@ Define la jerarquía de clases POO para la gestión de productos:
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from math import isfinite
 
-try:
-    from utils.exceptions import ValidationError
-except ImportError:
-    # Fallback temporal si el módulo de utils aún no ha sido integrado
-    class ValidationError(Exception):
-        """Excepción de validación de datos de dominio."""
-        pass
+from utils.exceptions import ValidationError
 
 
 class DescuentoMixin:
@@ -116,10 +110,10 @@ class Producto(ABC):
     def precio(self, valor: float) -> None:
         try:
             precio_float = float(valor)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, OverflowError):
             raise ValidationError(f"El precio debe ser un número válido. Recibido: {valor}")
 
-        if precio_float <= 0.0:
+        if not isfinite(precio_float) or round(precio_float, 2) <= 0.0:
             raise ValidationError(
                 f"El precio debe ser un número estrictamente mayor a 0. Recibido: {precio_float}"
             )
@@ -135,10 +129,10 @@ class Producto(ABC):
     def stock(self, valor: int) -> None:
         try:
             stock_int = int(valor)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, OverflowError):
             raise ValidationError(f"El stock debe ser un número entero válido. Recibido: {valor}")
 
-        if stock_int < 0:
+        if isinstance(valor, bool) or stock_int != valor or stock_int < 0:
             raise ValidationError(
                 f"El stock no puede ser un valor negativo. Recibido: {stock_int}"
             )
@@ -173,6 +167,7 @@ class Electronico(Producto, DescuentoMixin):
     y un costo adicional por meses de garantía extendida.
     """
 
+    DESCUENTO_STOCK: float = 5.0
     TASA_IMPUESTO_TECNOLOGICO: float = 0.18  # 18% IGV / Tasa arancelaria
     COSTO_POR_MES_GARANTIA: float = 5.0      # S/ 5.00 de seguro por mes de garantía
 
@@ -226,7 +221,7 @@ class Electronico(Producto, DescuentoMixin):
     def garantia_meses(self, valor: int) -> None:
         try:
             meses_int = int(valor)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, OverflowError):
             raise ValidationError("Los meses de garantía deben ser un entero válido.")
         if meses_int < 0:
             raise ValidationError("Los meses de garantía no pueden ser negativos.")
@@ -241,7 +236,7 @@ class Electronico(Producto, DescuentoMixin):
     def descuento_promo(self, valor: float) -> None:
         try:
             val_float = float(valor)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, OverflowError):
             raise ValidationError("El descuento promocional debe ser numérico.")
         if not (0.0 <= val_float <= 100.0):
             raise ValidationError("El descuento promocional debe estar entre 0% y 100%.")
@@ -252,6 +247,7 @@ class Electronico(Producto, DescuentoMixin):
         
         Fórmula:
             Base con descuento promocional (vía DescuentoMixin)
+            Descuento adicional del 5% cuando el stock supera 50
             + Impuesto Tecnológico (18% sobre base con descuento)
             + Costo por meses de garantía extendida
             
@@ -259,6 +255,10 @@ class Electronico(Producto, DescuentoMixin):
             float: Precio de venta final redondeado a 2 decimales.
         """
         precio_con_descuento = self.aplicar_descuento(self._precio, self._descuento_promo)
+        if self.stock > 50:
+            precio_con_descuento = self.aplicar_descuento(
+                precio_con_descuento, self.DESCUENTO_STOCK
+            )
         impuesto = precio_con_descuento * self.TASA_IMPUESTO_TECNOLOGICO
         adicional_garantia = self._garantia_meses * self.COSTO_POR_MES_GARANTIA
         return round(precio_con_descuento + impuesto + adicional_garantia, 2)
@@ -276,11 +276,10 @@ class Libro(Producto, DescuentoMixin):
     """Especialización para libros físicos y digitales.
     
     Aplica herencia múltiple (Producto + DescuentoMixin).
-    Sobrescribe calcular_precio_final() considerando exención tributaria (0% IGV según ley editorial)
-    y un descuento adicional del 15% para ediciones digitales (ahorro en costo de imprenta).
+    Sobrescribe calcular_precio_final() sin recargo de IGV y con un descuento del 10% para libros de texto.
     """
 
-    DESCUENTO_EDICION_DIGITAL: float = 15.0  # 15% de descuento por ser digital (ahorro papel)
+    DESCUENTO_LIBRO_TEXTO: float = 10.0
 
     def __init__(
         self,
@@ -292,6 +291,8 @@ class Libro(Producto, DescuentoMixin):
         isbn: str,
         es_digital: bool = False,
         descuento_editorial: float = 0.0,
+        *,
+        es_texto: bool = False,
     ) -> None:
         """Inicializa un libro invocando al constructor de la clase base con super().
         
@@ -303,7 +304,8 @@ class Libro(Producto, DescuentoMixin):
             autor (str): Nombre del autor o autores.
             isbn (str): Código ISBN normalizado.
             es_digital (bool, opcional): True si es eBook/digital, False si es físico.
-            descuento_editorial (float, opcional): Descuento de feria/editorial en % (0 a 100).
+            descuento_editorial (float, opcional): Descuento de editorial en % (0 a 100).
+            es_texto (bool, opcional): Indica si es un libro de texto.
         """
         super().__init__(id_producto, nombre, precio, stock)
         self._autor: str = ""
@@ -315,6 +317,7 @@ class Libro(Producto, DescuentoMixin):
         self.isbn = isbn
         self.es_digital = es_digital
         self.descuento_editorial = descuento_editorial
+        self.es_texto = es_texto
 
     @property
     def autor(self) -> str:
@@ -350,6 +353,17 @@ class Libro(Producto, DescuentoMixin):
         self._es_digital = valor
 
     @property
+    def es_texto(self) -> bool:
+        """Indica si el libro recibe el descuento para textos."""
+        return self._es_texto
+
+    @es_texto.setter
+    def es_texto(self, valor: bool) -> None:
+        if not isinstance(valor, bool):
+            raise ValidationError("El indicador de libro de texto debe ser booleano.")
+        self._es_texto = valor
+
+    @property
     def descuento_editorial(self) -> float:
         """Getter del descuento de editorial en porcentaje."""
         return self._descuento_editorial
@@ -358,7 +372,7 @@ class Libro(Producto, DescuentoMixin):
     def descuento_editorial(self, valor: float) -> None:
         try:
             val_float = float(valor)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, OverflowError):
             raise ValidationError("El descuento editorial debe ser numérico.")
         if not (0.0 <= val_float <= 100.0):
             raise ValidationError("El descuento editorial debe estar entre 0% y 100%.")
@@ -369,23 +383,26 @@ class Libro(Producto, DescuentoMixin):
         
         Fórmula:
             Base con descuento editorial (vía DescuentoMixin)
-            Si es_digital es True: se aplica un descuento extra del 15% por edición digital.
-            Impuesto = 0.0 (Exonerado según Ley de Fomento del Libro y Lectura)
+            Si es_texto es True: se aplica un descuento adicional del 10%.
+            Impuesto = 0.0
             
         Returns:
             float: Precio final neto de venta.
         """
         precio_con_desc = self.aplicar_descuento(self._precio, self._descuento_editorial)
-        if self._es_digital:
-            precio_con_desc = self.aplicar_descuento(precio_con_desc, self.DESCUENTO_EDICION_DIGITAL)
+        if self.es_texto:
+            precio_con_desc = self.aplicar_descuento(
+                precio_con_desc, self.DESCUENTO_LIBRO_TEXTO
+            )
         return round(precio_con_desc, 2)
 
     def __str__(self) -> str:
         """Representación detallada de un libro."""
         tipo_formato = "Digital (eBook)" if self._es_digital else "Físico"
+        tipo_libro = "Texto" if self.es_texto else "General"
         base_str = super().__str__()
         return (
             f"{base_str} | Autor: {self._autor} | "
-            f"ISBN: {self._isbn} | Formato: {tipo_formato} | Desc. Editorial: {self._descuento_editorial}%"
+            f"ISBN: {self._isbn} | Formato: {tipo_formato} | Tipo: {tipo_libro} | Desc. Editorial: {self._descuento_editorial}%"
         )
 

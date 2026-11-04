@@ -1,5 +1,1 @@
-# Requerimientos del Sistema de Gestión de Productos (CLI)
-# Compatible con Python 3.11 o superior
-# El proyecto utiliza módulos nativos de la biblioteca estándar de Python (abc, typing, dataclasses, sys)
-python>=3.11
-
+# Python 3.11 o superior. Sin dependencias externas.

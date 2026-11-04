@@ -49,6 +49,7 @@ classDiagram
         -_marca: str
         -_garantia_meses: int
         -_descuento_promo: float
+        +DESCUENTO_STOCK: float = 5.0
         +TASA_IMPUESTO_TECNOLOGICO: float = 0.18
         +COSTO_POR_MES_GARANTIA: float = 5.0
         +__init__(id_producto, nombre, precio, stock, marca, garantia_meses, descuento_promo)
@@ -64,8 +65,9 @@ classDiagram
         -_isbn: str
         -_es_digital: bool
         -_descuento_editorial: float
-        +DESCUENTO_EDICION_DIGITAL: float = 15.0
-        +__init__(id_producto, nombre, precio, stock, autor, isbn, es_digital, descuento_editorial)
+        +DESCUENTO_LIBRO_TEXTO: float = 10.0
+        +es_texto : bool
+        +__init__(id_producto, nombre, precio, stock, autor, isbn, es_digital, descuento_editorial, es_texto)
         +autor : str
         +isbn : str
         +es_digital : bool
@@ -126,9 +128,9 @@ En el diseño de este sistema se adoptó un enfoque híbrido fundamentado en pri
    - **Criterio "Es-Un" (Is-A):** Un televisor o laptop *es un* producto tecnológico; una novela *es un* producto bibliográfico. Comparten identidad de dominio: tienen SKU/ID, nombre comercial, costo base e inventario físico.
    - **Principio de Sustitución de Liskov (LSP):** Cualquier función o módulo del sistema (como el inventario en el CLI o el generador de reportes) puede manipular objetos `Producto` y llamar a `calcular_precio_final()` o `__str__()` de forma polimórfica sin conocer la subclase concreta.
 
-2. **Composición / Mixin (`DescuentoMixin`):**
+2. **Herencia múltiple con mixin (`DescuentoMixin`):**
    - **Reutilización de Comportamiento sin Acoplamiento Vertical:** La capacidad de aplicar porcentajes promocionales no define la esencia de un producto (no todo producto requiere promociones, ni las promociones son exclusivas de productos).
-   - En lugar de forzar una jerarquía rígida o inflar la clase base abstracta `Producto` con métodos promocionales que no todas las subclases futuras requerirían, se modularizó en un **Mixin independiente**.
+   - En lugar de forzar una jerarquía rígida o inflar la clase base abstracta `Producto` con métodos promocionales que no todas las subclases futuras requerirían, se eligió un mixin para reutilizar el método de descuento sin instanciar un colaborador por producto.
 
 ---
 
@@ -173,19 +175,25 @@ python main.py
 
 ---
 
+El inventario se guarda en memoria durante la sesión. El menú asigna IDs consecutivos y permite consultar o actualizar el stock.
+
+### Reglas de precio
+
+- **Electrónicos.** Cuando el stock supera 50, se aplica un descuento del 5 % sobre la base. Se eligió esa tasa porque la guía deja el porcentaje abierto. Sobre la base descontada se aplica 18 % de IGV y luego se suman S/ 5 por mes de garantía.
+- **Libros.** Los libros de texto reciben un descuento del 10 %. El formato físico o digital se registra por separado en el modelo.
+
 ## 📸 7. Evidencias de Ejecución (Capturas)
 
-> *Sección completada durante la integración de pruebas por Tocas Anglas Angel.*
+Las imágenes se generaron a partir de la salida de ejecuciones reales de `python main.py`.
 
-### Caso 1: Flujo Exitoso (Ruta Feliz)
-*Registro de productos Electrónico y Libro, y listado polimórfico con cálculo de precios finales.*
-*(Adjuntar captura: `docs/screenshots/caso_exitoso.png`)*
+### Caso 1. Registro y listado polimórfico
 
-### Caso 2: Excepción Capturada 1 (`ValidationError`)
-*Intento de registrar un producto con precio `<= 0` o stock negativo, capturado por el bloque `try/except`.*
-*(Adjuntar captura: `docs/screenshots/error_validation.png`)*
+![Registro y listado de un electrónico y un libro](docs/screenshots/caso_exitoso.png)
 
-### Caso 3: Excepción Capturada 2 (`NotFoundError`)
-*Búsqueda o actualización de un ID de producto inexistente en el inventario.*
-*(Adjuntar captura: `docs/screenshots/error_not_found.png`)*
+### Caso 2. Precio negativo
 
+![ValidationError al ingresar un precio negativo](docs/screenshots/error_validation.png)
+
+### Caso 3. ID inexistente
+
+![NotFoundError al buscar un producto inexistente](docs/screenshots/error_not_found.png)

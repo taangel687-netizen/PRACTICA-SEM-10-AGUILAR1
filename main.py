@@ -29,11 +29,7 @@ def listar_productos(inventario: dict[str, Producto]) -> str:
     """Muestra los productos con el precio final de cada tipo."""
     if not inventario:
         return "El inventario está vacío."
-    return "\n".join(
-        f"ID {id_prod} | {producto} | Precio final: S/ "
-        f"{producto.calcular_precio_final():.2f}"
-        for id_prod, producto in inventario.items()
-    )
+    return "\n".join(str(producto) for producto in inventario.values())
 
 
 def main() -> None:
@@ -54,16 +50,25 @@ def main() -> None:
                 case "1":
                     id_prod = str(len(inventario) + 1)
                     nombre, precio, stock = leer_datos_producto()
+                    marca = sanitizar_texto(input("Marca: "))
                     garantia = validar_entero_no_negativo(input("Garantía (meses): "))
                     inventario[id_prod] = Electronico(
-                        id_prod, nombre, precio, stock, garantia
+                        id_producto=id_prod, nombre=nombre, precio=precio,
+                        stock=stock, marca=marca, garantia_meses=garantia,
                     )
                     mensaje = f"Electrónico registrado con ID {id_prod}."
                 case "2":
                     id_prod = str(len(inventario) + 1)
                     nombre, precio, stock = leer_datos_producto()
                     autor = sanitizar_texto(input("Autor: "))
-                    inventario[id_prod] = Libro(id_prod, nombre, precio, stock, autor)
+                    isbn = sanitizar_texto(input("ISBN: "))
+                    respuesta = input("¿Es un libro de texto? (s/n): ").strip().lower()
+                    if respuesta not in {"s", "n"}:
+                        raise ValidationError("Responde s o n.")
+                    inventario[id_prod] = Libro(
+                        id_producto=id_prod, nombre=nombre, precio=precio,
+                        stock=stock, autor=autor, isbn=isbn, es_texto=respuesta == "s",
+                    )
                     mensaje = f"Libro registrado con ID {id_prod}."
                 case "3":
                     mensaje = listar_productos(inventario)
