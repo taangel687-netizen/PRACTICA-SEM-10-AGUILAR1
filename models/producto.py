@@ -388,3 +388,4 @@ class Libro(Producto, DescuentoMixin):
             f"{base_str} | Autor: {self._autor} | "
             f"ISBN: {self._isbn} | Formato: {tipo_formato} | Desc. Editorial: {self._descuento_editorial}%"
         )
+

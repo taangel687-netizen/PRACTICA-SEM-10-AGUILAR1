@@ -188,3 +188,4 @@ python main.py
 ### Caso 3: Excepción Capturada 2 (`NotFoundError`)
 *Búsqueda o actualización de un ID de producto inexistente en el inventario.*
 *(Adjuntar captura: `docs/screenshots/error_not_found.png`)*
+
